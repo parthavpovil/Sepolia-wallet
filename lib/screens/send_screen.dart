@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../services/wallet_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'dart:math';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'receive_screen.dart';
 
 class SendScreen extends StatefulWidget {
   final String address;
@@ -81,6 +83,19 @@ class _SendScreenState extends State<SendScreen> {
       appBar: AppBar(
         title: const Text('Send ETH'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReceiveScreen(address: widget.address),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
