@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'services/wallet_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'screens/send_screen.dart';
+import 'screens/transactions_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -190,6 +191,19 @@ class _WalletScreenState extends State<WalletScreen> {
                                 );
                               },
                               child: const Text('Send ETH'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TransactionsScreen(
+                                      address: _address!,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('View Transactions'),
                             ),
                           ],
                         ),
