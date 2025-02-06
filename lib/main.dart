@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/wallet_service.dart';
 import 'package:web3dart/web3dart.dart';
+import 'screens/send_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -174,6 +175,21 @@ class _WalletScreenState extends State<WalletScreen> {
                               'Balance: ${_balance?.getValueInUnit(EtherUnit.ether)} ETH',
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SendScreen(
+                                      address: _address!,
+                                      privateKey: _privateKey!,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('Send ETH'),
                             ),
                           ],
                         ),
