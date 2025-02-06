@@ -4,6 +4,7 @@ import 'services/wallet_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'screens/send_screen.dart';
 import 'screens/transactions_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,47 +70,28 @@ class _WalletScreenState extends State<WalletScreen> {
     _initializeWallet();
   }
 
-  void _onItemTapped(int index) {
-    if (_address == null) return;
-
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    switch (index) {
-      case 1: // Send
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SendScreen(
-              address: _address!,
-              privateKey: _privateKey!,
-            ),
-          ),
-        ).then((_) => setState(() => _selectedIndex = 0));
-        break;
-      case 2: // Transactions
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TransactionsScreen(
-              address: _address!,
-            ),
-          ),
-        ).then((_) => setState(() => _selectedIndex = 0));
-        break;
-    }
-  }
-
   Future<void> _initializeWallet() async {
     setState(() => _isLoading = true);
     try {
       await _walletService.init();
       final savedAddress = _walletService.getSavedAddress();
       if (savedAddress != null) {
-        _address = savedAddress;
-        _privateKey = _walletService.getSavedPrivateKey();
+        setState(() {
+          _address = savedAddress;
+          _privateKey = _walletService.getSavedPrivateKey();
+        });
         await _refreshBalance();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                address: _address!,
+                privateKey: _privateKey!,
+              ),
+            ),
+          );
+        }
       }
     } finally {
       setState(() => _isLoading = false);
@@ -126,6 +108,17 @@ class _WalletScreenState extends State<WalletScreen> {
         _privateKey = wallet['privateKey'];
       });
       await _refreshBalance();
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(
+              address: _address!,
+              privateKey: _privateKey!,
+            ),
+          ),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -235,29 +228,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ],
                 ],
               ),
-            ),
-      bottomNavigationBar: _address == null
-          ? null
-          : BottomNavigationBar(
-              items: const <BottomNavigationBarItem>[
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.account_balance_wallet),
-                  label: 'Wallet',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.send),
-                  label: 'Send',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.history),
-                  label: 'History',
-                ),
-              ],
-              currentIndex: _selectedIndex,
-              selectedItemColor: const Color(0xFFFCA311),
-              unselectedItemColor: const Color(0xFF14213D),
-              backgroundColor: Colors.white,
-              onTap: _onItemTapped,
             ),
     );
   }
