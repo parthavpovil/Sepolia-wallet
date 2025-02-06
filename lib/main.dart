@@ -19,22 +19,27 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sepolia Wallet',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme(
+          brightness: Brightness.light,
+          primary: const Color(0xFF14213D),
+          onPrimary: Colors.white,
+          secondary: const Color(0xFFFCA311),
+          onSecondary: const Color(0xFF14213D),
+          error: Colors.red,
+          onError: Colors.white,
+          background: const Color(0xFFE5E5E5),
+          onBackground: const Color(0xFF14213D),
+          surface: Colors.white,
+          onSurface: const Color(0xFF14213D),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFE5E5E5),
+        cardColor: Colors.white,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFF14213D)),
+          bodyMedium: TextStyle(color: Color(0xFF14213D)),
+          titleLarge: TextStyle(color: Color(0xFF14213D)),
+          titleMedium: TextStyle(color: Color(0xFF14213D)),
+        ),
         useMaterial3: true,
       ),
       home: const WalletScreen(),
@@ -56,11 +61,44 @@ class _WalletScreenState extends State<WalletScreen> {
   String? _privateKey;
   EtherAmount? _balance;
   bool _isLoading = false;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _initializeWallet();
+  }
+
+  void _onItemTapped(int index) {
+    if (_address == null) return;
+
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 1: // Send
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SendScreen(
+              address: _address!,
+              privateKey: _privateKey!,
+            ),
+          ),
+        ).then((_) => setState(() => _selectedIndex = 0));
+        break;
+      case 2: // Transactions
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionsScreen(
+              address: _address!,
+            ),
+          ),
+        ).then((_) => setState(() => _selectedIndex = 0));
+        break;
+    }
   }
 
   Future<void> _initializeWallet() async {
@@ -102,20 +140,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: const Text('Sepolia Wallet'),
         actions: [
           if (_address != null)
@@ -174,79 +201,63 @@ class _WalletScreenState extends State<WalletScreen> {
                             const SizedBox(height: 16),
                             Text(
                               'Balance: ${_balance?.getValueInUnit(EtherUnit.ether)} ETH',
-                              style: const TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => SendScreen(
-                                      address: _address!,
-                                      privateKey: _privateKey!,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Text('Send ETH'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TransactionsScreen(
-                                      address: _address!,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Text('View Transactions'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (_mnemonic != null) ...[
-                    const SizedBox(height: 20),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Seed Phrase (Keep this safe!):',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(_mnemonic!),
-                            const SizedBox(height: 8),
-                            ElevatedButton(
-                              onPressed: () {
-                                if (_mnemonic != null) {
-                                  Clipboard.setData(
-                                      ClipboardData(text: _mnemonic!));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Seed phrase copied to clipboard')));
-                                }
-                              },
-                              child: const Text('Copy Seed Phrase'),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF14213D),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
+                    if (_mnemonic != null) ...[
+                      const SizedBox(height: 20),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Seed Phrase (Keep this safe!):',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(_mnemonic!),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
+            ),
+      bottomNavigationBar: _address == null
+          ? null
+          : BottomNavigationBar(
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet),
+                  label: 'Wallet',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.send),
+                  label: 'Send',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.history),
+                  label: 'History',
+                ),
+              ],
+              currentIndex: _selectedIndex,
+              selectedItemColor: const Color(0xFFFCA311),
+              unselectedItemColor: const Color(0xFF14213D),
+              backgroundColor: Colors.white,
+              onTap: _onItemTapped,
             ),
     );
   }
