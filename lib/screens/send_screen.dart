@@ -4,6 +4,7 @@ import '../services/wallet_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'dart:math';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'receive_screen.dart';
 
 class SendScreen extends StatefulWidget {
@@ -46,9 +47,20 @@ class _SendScreenState extends State<SendScreen> {
       });
 
       try {
+        // Debug prints
+        print('Current wallet address: ${widget.address}');
+        print('Using private key: ${widget.privateKey}');
+
         // Convert ETH amount to Wei
         final ethAmount = double.parse(_amountController.text);
         final weiAmount = BigInt.from(ethAmount * pow(10, 18));
+
+        // Print debug information
+        print('Sending transaction:');
+        print('To: ${_addressController.text}');
+        print('Amount (ETH): $ethAmount');
+        print('Amount (Wei): $weiAmount');
+        print('Private Key: ${widget.privateKey}');
 
         final txHash = await _walletService.sendTransaction(
           toAddress: _addressController.text,
@@ -56,23 +68,41 @@ class _SendScreenState extends State<SendScreen> {
           privateKey: widget.privateKey,
         );
 
-        if (!mounted) return;
+        print('Transaction hash: $txHash');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Transaction sent! Hash: $txHash'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-        Navigator.pop(context);
+        if (mounted) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Transaction sent! Hash: $txHash'),
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'View',
+                onPressed: () {
+                  final url = 'https://sepolia.etherscan.io/tx/$txHash';
+                  launchUrl(Uri.parse(url));
+                },
+              ),
+            ),
+          );
+
+          // Clear form
+          _addressController.clear();
+          _amountController.clear();
+
+          // Don't pop the screen, let user see the result
+          setState(() {
+            _isLoading = false;
+          });
+        }
       } catch (e) {
-        setState(() {
-          _error = 'Error: ${e.toString()}';
-        });
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        print('Transaction error: $e');
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -83,19 +113,6 @@ class _SendScreenState extends State<SendScreen> {
       appBar: AppBar(
         title: const Text('Send ETH'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReceiveScreen(address: widget.address),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -108,14 +125,14 @@ class _SendScreenState extends State<SendScreen> {
                 controller: _addressController,
                 decoration: const InputDecoration(
                   labelText: 'Recipient Address',
-                  hintText: '0x...',
+                  hintText: 'Enter ETH address',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter an address';
+                    return 'Please enter recipient address';
                   }
                   if (!value.startsWith('0x') || value.length != 42) {
-                    return 'Please enter a valid Ethereum address';
+                    return 'Invalid ETH address';
                   }
                   return null;
                 },
@@ -125,34 +142,38 @@ class _SendScreenState extends State<SendScreen> {
                 controller: _amountController,
                 decoration: const InputDecoration(
                   labelText: 'Amount (ETH)',
-                  hintText: '0.01',
+                  hintText: 'Enter amount to send',
                 ),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter an amount';
+                    return 'Please enter amount';
                   }
                   if (double.tryParse(value) == null) {
                     return 'Please enter a valid number';
-                  }
-                  if (double.parse(value) <= 0) {
-                    return 'Amount must be greater than 0';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
               if (_error != null)
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _isLoading ? null : _sendTransaction,
                 child: _isLoading
-                    ? const CircularProgressIndicator()
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Send'),
               ),
             ],

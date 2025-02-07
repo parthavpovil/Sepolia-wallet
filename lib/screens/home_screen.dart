@@ -4,6 +4,7 @@ import 'package:web3dart/web3dart.dart';
 import '../services/wallet_service.dart';
 import 'send_screen.dart';
 import 'transactions_screen.dart';
+import 'import_wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String address;
@@ -114,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class WalletTab extends StatelessWidget {
+class WalletTab extends StatefulWidget {
   final String address;
   final String privateKey;
   final EtherAmount? balance;
@@ -129,6 +130,41 @@ class WalletTab extends StatelessWidget {
   });
 
   @override
+  State<WalletTab> createState() => _WalletTabState();
+}
+
+class _WalletTabState extends State<WalletTab> {
+  final WalletService _walletService = WalletService();
+  List<Map<String, String>> _wallets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeWallet();
+  }
+
+  Future<void> _initializeWallet() async {
+    await _walletService.init();
+    _loadWallets();
+  }
+
+  Future<void> _loadWallets() async {
+    final wallets = await _walletService.getAllWallets();
+    if (mounted) {
+      setState(() {
+        _wallets = wallets;
+        // Add current wallet if not in the list
+        if (!_wallets.any((w) => w['address'] == widget.address)) {
+          _wallets.add({
+            'address': widget.address,
+            'privateKey': widget.privateKey,
+          });
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -137,7 +173,10 @@ class WalletTab extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: onRefresh,
+            onPressed: () {
+              widget.onRefresh();
+              _loadWallets();
+            },
           ),
         ],
       ),
@@ -146,49 +185,98 @@ class WalletTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Always show current wallet info
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+              color: Colors.green.shade50,
+              child: ListTile(
+                title: const Text(
+                  'Current Wallet',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Wallet Address:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            address,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy),
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: address));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Address copied to clipboard'),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                    Text('Address: ${widget.address}'),
                     Text(
-                      'Balance: ${balance?.getValueInUnit(EtherUnit.ether)} ETH',
+                      'Balance: ${widget.balance?.getValueInUnit(EtherUnit.ether)} ETH',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF14213D),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            // Rest of the wallets
+            if (_wallets.isNotEmpty) ...[
+              const Text(
+                'All Wallets:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _wallets.length,
+                itemBuilder: (context, index) {
+                  final wallet = _wallets[index];
+                  final isActive = wallet['address'] == widget.address;
+
+                  if (isActive)
+                    return const SizedBox.shrink(); // Skip current wallet
+
+                  return Card(
+                    child: ListTile(
+                      title: Text('Wallet ${index + 1}'),
+                      subtitle: Text('Address: ${wallet['address']}'),
+                      trailing: TextButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HomeScreen(
+                                address: wallet['address']!,
+                                privateKey: wallet['privateKey']!,
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('Switch'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ImportWalletScreen(),
+                  ),
+                );
+                if (result != null) {
+                  _loadWallets();
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => HomeScreen(
+                        address: result['address'],
+                        privateKey: result['privateKey'],
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Import Another Wallet'),
             ),
           ],
         ),

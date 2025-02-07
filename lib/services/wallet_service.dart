@@ -12,28 +12,36 @@ class WalletService {
 
   late Web3Client _web3client;
   late SharedPreferences _prefs;
+  bool _isInitialized = false;
 
   Future<void> init() async {
+    if (_isInitialized) return;
+
     final client = Client();
     _web3client = Web3Client(rpcUrl, client);
     _prefs = await SharedPreferences.getInstance();
+    _isInitialized = true;
+  }
+
+  Future<void> clearOldWalletData() async {
+    await _prefs.remove('private_key');
+    await _prefs.remove('address');
   }
 
   Future<Map<String, String>> createWallet() async {
-    // Generate a random mnemonic (seed phrase)
-    final mnemonic = bip39.generateMnemonic();
+    // Clear old wallet data first
+    await clearOldWalletData();
 
-    // Generate private key from mnemonic
+    final mnemonic = bip39.generateMnemonic();
     final seed = bip39.mnemonicToSeed(mnemonic);
     final privateKey = HEX.encode(seed.sublist(0, 32));
-
-    // Generate Ethereum address from private key
     final credentials = EthPrivateKey.fromHex(privateKey);
     final address = credentials.address.hex;
 
-    // Save private key securely
     await _prefs.setString('private_key', privateKey);
     await _prefs.setString('address', address);
+
+    await addWallet(address, privateKey);
 
     return {
       'mnemonic': mnemonic,
@@ -47,35 +55,51 @@ class WalletService {
     return await _web3client.getBalance(ethAddress);
   }
 
-  Future<String> sendTransaction(
-      {required String toAddress,
-      required BigInt amount,
-      required String privateKey}) async {
-    final credentials = EthPrivateKey.fromHex(privateKey);
-    final fromAddress = credentials.address;
+  Future<String> sendTransaction({
+    required String toAddress,
+    required BigInt amount,
+    required String privateKey,
+  }) async {
+    try {
+      // Print debug info to verify the correct account
+      print('Sending from private key: $privateKey');
 
-    // Get the current nonce for the sender address
-    final nonce = await _web3client.getTransactionCount(fromAddress);
+      final credentials = EthPrivateKey.fromHex(privateKey);
+      final fromAddress = credentials.address;
 
-    // Get current gas price
-    final gasPrice = await _web3client.getGasPrice();
+      print('Sending from address: ${fromAddress.hex}');
 
-    final transaction = Transaction(
-      to: EthereumAddress.fromHex(toAddress),
-      value: EtherAmount.fromBigInt(EtherUnit.wei, amount),
-      maxGas: 21000, // Standard gas limit for ETH transfers
-      gasPrice: gasPrice,
-      nonce: nonce,
-    );
+      final gasPrice = await _web3client.getGasPrice();
+      final nonce = await _web3client.getTransactionCount(fromAddress);
 
-    // Send the transaction
-    final txHash = await _web3client.sendTransaction(
-      credentials,
-      transaction,
-      chainId: 11155111, // Sepolia chain ID
-    );
+      // Estimate gas
+      final gasLimit = await _web3client.estimateGas(
+        sender: fromAddress,
+        to: EthereumAddress.fromHex(toAddress),
+        value: EtherAmount.fromBigInt(EtherUnit.wei, amount),
+      );
 
-    return txHash;
+      final transaction = Transaction(
+        to: EthereumAddress.fromHex(toAddress),
+        value: EtherAmount.fromBigInt(EtherUnit.wei, amount),
+        maxGas: gasLimit.toInt(),
+        gasPrice: gasPrice,
+        nonce: nonce,
+      );
+
+      final txHash = await _web3client.sendTransaction(
+        credentials,
+        transaction,
+        chainId: 11155111,
+      );
+
+      // Verify transaction was sent from correct address
+      print('Transaction sent with hash: $txHash');
+      return txHash;
+    } catch (e) {
+      print('Error sending transaction: $e');
+      rethrow;
+    }
   }
 
   String? getSavedPrivateKey() {
@@ -84,5 +108,61 @@ class WalletService {
 
   String? getSavedAddress() {
     return _prefs.getString('address');
+  }
+
+  Future<Map<String, String>> importWallet(String mnemonic) async {
+    // Clear old wallet data first
+    await clearOldWalletData();
+
+    if (!bip39.validateMnemonic(mnemonic)) {
+      throw Exception('Invalid mnemonic');
+    }
+
+    final seed = bip39.mnemonicToSeed(mnemonic);
+    final privateKey = HEX.encode(seed.sublist(0, 32));
+    final credentials = EthPrivateKey.fromHex(privateKey);
+    final address = credentials.address.hex;
+
+    await _prefs.setString('private_key', privateKey);
+    await _prefs.setString('address', address);
+
+    await addWallet(address, privateKey);
+
+    return {
+      'privateKey': privateKey,
+      'address': address,
+    };
+  }
+
+  Future<void> dispose() async {
+    await _web3client.dispose();
+  }
+
+  Future<List<Map<String, String>>> getAllWallets() async {
+    final List<String> walletKeys = _prefs.getStringList('wallet_list') ?? [];
+    List<Map<String, String>> wallets = [];
+
+    for (String key in walletKeys) {
+      final address = _prefs.getString('address_$key');
+      final privateKey = _prefs.getString('private_key_$key');
+      if (address != null && privateKey != null) {
+        wallets.add({
+          'address': address,
+          'privateKey': privateKey,
+        });
+      }
+    }
+    return wallets;
+  }
+
+  Future<void> addWallet(String address, String privateKey) async {
+    final List<String> walletKeys = _prefs.getStringList('wallet_list') ?? [];
+    final String walletKey = DateTime.now().millisecondsSinceEpoch.toString();
+
+    await _prefs.setString('address_$walletKey', address);
+    await _prefs.setString('private_key_$walletKey', privateKey);
+
+    walletKeys.add(walletKey);
+    await _prefs.setStringList('wallet_list', walletKeys);
   }
 }
